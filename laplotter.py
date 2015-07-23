@@ -15,7 +15,8 @@ class LossAccPlot(object):
                  show_averages=True,
                  show_loss_plot=True,
                  show_acc_plot=True,
-                 show_plot_window=True):
+                 show_plot_window=True,
+                 x_label="Epoch"):
         """Constructs the plotter.
         Args:
             save_to_filepath: The filepath to a file at which the plot
@@ -61,6 +62,7 @@ class LossAccPlot(object):
         self.show_acc_plot = show_acc_plot
         self.show_plot_window = show_plot_window
         self.save_to_filepath = save_to_filepath
+        self.x_label = x_label
 
         self.poly_forward_perc=0.1,
         self.poly_backward_perc=0.2,
@@ -170,9 +172,6 @@ class LossAccPlot(object):
         ax1 = self.ax_loss
         ax2 = self.ax_acc
 
-        # List of each epoch (x-axis)
-        epochs = list(range(0, epoch+1))
-
         # Clear loss and accuracy charts
         if ax1:
             ax1.clear()
@@ -215,38 +214,33 @@ class LossAccPlot(object):
                      ls_acc_val, label="acc. val.")
 
         if self.show_regressions:
-            # Compute the regression lines for the n_forward future epochs.
-            # n_forward is calculated relative to the current epoch
-            # (e.g. at epoch 100 compute 10 next, at 200 the 20 next ones...).
-            n_forward = int(max((epoch+1)*self.poly_forward_perc,
-                                self.poly_forward_min))
+            # calculate future values for loss train (lt), loss val (lv),
+            # acc train (at) and acc val (av)
+            lt_regression = self._calc_regression(self.values_loss_train_x,
+                                                  self.values_loss_train_y)
+            lv_regression = self._calc_regression(self.values_loss_val_x,
+                                                  self.values_loss_val_y)
+            # predicting accuracy values isnt necessary if theres no acc chart
+            if ax2:
+                at_regression = self._calc_regression(self.values_acc_train_x,
+                                                      self.values_acc_train_y)
+                av_regression = self._calc_regression(self.values_acc_val_x,
+                                                      self.values_acc_val_y)
 
-            # Compute regression lines based on n_backwards epochs
-            # in the past, e.g. based on the last 10 values.
-            # n_backwards is calculated relative to the current epoch
-            # (e.g. at epoch 100 compute based on the last 10 values,
-            # at 200 based on the last 20 values...).
-            n_backwards = int(max((epoch+1)*self.poly_backward_perc,
-                                  self.poly_backward_min))
-
-            # List of epochs for which to estimate/predict the likely value.
-            # (epoch..epoch+n_forward instead of epoch+1..epoch+n_forward
-            # so that the regression line is better connected to the line its
-            # based on (no obvious gap).)
-            future_epochs = [i for i in range(epoch, epoch + n_forward)]
-
-            self.plot_regression_line(ax1, train_loss, epochs, future_epochs,
-                                      n_backwards, linestyles[2],
-                                      'train loss regression')
-            self.plot_regression_line(ax1, val_loss, epochs, future_epochs,
-                                      n_backwards, linestyles[3],
-                                      'val loss regression')
-            self.plot_regression_line(ax2, train_acc, epochs, future_epochs,
-                                      n_backwards, linestyles[2],
-                                      'train acc regression')
-            self.plot_regression_line(ax2, val_acc, epochs, future_epochs,
-                                      n_backwards, linestyles[3],
-                                      'val acc regression')
+            # plot the predicted values
+            ax1.plot(lt_regression[0], lt_regression[1],
+                     self.linestyles["loss_train_regression"],
+                     label="loss train regression")
+            ax1.plot(lv_regression[0], lv_regression[1],
+                     self.linestyles["loss_val_regression"],
+                     label="loss val. regression")
+            if ax2:
+                ax2.plot(at_regression[0], at_regression[1],
+                         self.linestyles["acc_train_regression"],
+                         label="acc train regression")
+                ax2.plot(av_regression[0], av_regression[1],
+                         self.linestyles["acc_val_regression"],
+                         label="acc val. regression")
 
         # Add legend (below chart)
         if ax1:
@@ -261,16 +255,50 @@ class LossAccPlot(object):
         # Labels for x and y axis
         if ax1:
             ax1.set_ylabel("loss")
-            ax1.set_xlabel("epoch")
+            ax1.set_xlabel(self.x_label)
         if ax2:
             ax2.set_ylabel("accuracy")
-            ax2.set_xlabel("epoch")
+            ax2.set_xlabel(self.x_label)
 
         # Show a grid in both charts
         if ax1:
             ax1.grid(True)
         if ax2:
             ax2.grid(True)
+
+    def _calc_regression(self, x_values, y_values):
+        if not x_values:
+            return ([], [])
+
+        last_x = x_values[-1]
+
+        # Compute the regression lines for the n_forward future epochs.
+        # n_forward is calculated relative to the current epoch
+        # (e.g. at epoch 100 compute 10 next, at 200 the 20 next ones...).
+        n_forward = int(max((last_x + 1) * self.poly_forward_perc,
+                            self.poly_forward_min))
+
+        # Compute regression lines based on n_backwards epochs
+        # in the past, e.g. based on the last 10 values.
+        # n_backwards is calculated relative to the current epoch
+        # (e.g. at epoch 100 compute based on the last 10 values,
+        # at 200 based on the last 20 values...).
+        n_backwards = int(max((last_x + 1) * self.poly_backward_perc,
+                              self.poly_backward_min))
+
+        fit = np.polyfit(x_values[-n_backwards:], y_values[-n_backwards:],
+                         self.poly_degree)
+        poly = np.poly1d(fit)
+
+        # calculate future x- and y-values
+        # we use last_x to last_x+n_forward here instead of
+        #        last_x+1 to last_x+1+n_forward
+        # so that the regression line is better connected to the current line
+        # (no visible gap)
+        future_x = [i for i in range(last_x, last_x + n_forward)]
+        future_y = [poly(x_idx) for x_idx in future_x]
+
+        return (future_x, future_y)
 
     def plot_regression_line(self, plot_ax, data, epochs, future_epochs,
                              n_backwards, linestyle, label):
