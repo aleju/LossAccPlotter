@@ -68,11 +68,28 @@ class LossAccPlot(object):
         self.poly_n_backward_min=10,
         self.poly_degree=1
 
-        if linestyles is None:
-            self.linestyles = ['r-', 'b-', 'r:', 'b:']
-
-        if linestyles_first_epoch is None:
-            self.linestyles_first_epoch = ['rs-', 'b^-', 'r:', 'b:']
+        self.linestyles = {
+            "loss_train": "r-",
+            "loss_train_regression": "r:",
+            "loss_val": "b-",
+            "loss_val_regression": "b:",
+            "acc_train": "r-",
+            "acc_train_regression": "r:",
+            "acc_val": "b-",
+            "acc_val_regression": "b:"
+        }
+        # different linestyles for the first epoch, because there will be only
+        # one value available => no line can be drawn
+        self.linestyles_first_epoch = {
+            "loss_train": "rs-",
+            "loss_train_regression": "r:",
+            "loss_val": "b^-",
+            "loss_val_regression": "b^:",
+            "acc_train": "rs-",
+            "acc_train_regression": "r:",
+            "acc_val": "b^-",
+            "acc_val_regression": "b^:"
+        }
 
         # ----
         # Initialize plots
@@ -94,6 +111,33 @@ class LossAccPlot(object):
                 box = ax.get_position()
                 ax.set_position([box.x0, box.y0 + box.height * 0.1,
                                  box.width, box.height * 0.9])
+
+        self.values_loss_train_x = []
+        self.values_loss_val_x = []
+        self.values_acc_train_x = []
+        self.values_acc_val_x = []
+        self.values_loss_train_y = []
+        self.values_loss_val_y = []
+        self.values_acc_train_y = []
+        self.values_acc_val_y = []
+
+    def add_values(self, x_index, loss_train=None, loss_val=None, acc_train=None,
+                   acc_val=None, redraw=True):
+        if loss_train is not None:
+            self.values_loss_train_x.append(x_index)
+            self.values_loss_train_y.append(loss_train)
+        if loss_val is not None:
+            self.values_loss_val_x.append(x_index)
+            self.values_loss_val_y.append(loss_val)
+        if acc_train is not None:
+            self.values_acc_train_x.append(x_index)
+            self.values_acc_train_y.append(acc_train)
+        if acc_val is not None:
+            self.values_acc_val_x.append(x_index)
+            self.values_acc_val_y.append(acc_val)
+
+        if redraw:
+            self._redraw_plot()
 
     def update(self, epoch, train_loss, train_acc, val_loss, val_acc):
         """Updates the plot with the latest data.
