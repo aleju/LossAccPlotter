@@ -80,7 +80,7 @@ class LossAccPlot(object):
         }
         # different linestyles for the first epoch, because there will be only
         # one value available => no line can be drawn
-        self.linestyles_first_epoch = {
+        self.linestyles_one_value = {
             "loss_train": "rs-",
             "loss_train_regression": "r:",
             "loss_val": "b^-",
@@ -137,31 +137,9 @@ class LossAccPlot(object):
             self.values_acc_val_y.append(acc_val)
 
         if redraw:
-            self._redraw_plot()
-
-    def update(self, epoch, train_loss, train_acc, val_loss, val_acc):
-        """Updates the plot with the latest data.
-        Args:
-            train_loss: All of the training loss values of each
-                epoch (list of floats).
-            train_acc: All of the training accuracy values of each
-                epoch (list of floats).
-            val_loss: All of the validation loss values of each
-                epoch (list of floats).
-            val_acc: All of the validation accuracy values of each
-                epoch (list of floats).
-        """
-        self._redraw_plot(epoch, train_loss, train_acc, val_loss, val_acc)
-
-        # show plot window or redraw an existing one
-        if self.show_plot_window:
-            plt.figure(self.fig.number)
-            plt.show(block=False)
-            plt.draw()
-
-        # save
-        if self.save_to_filepath:
-            self._save_plot(self.save_to_filepath)
+            self._redraw()
+            if self.save_to_filepath:
+                self._save_plot(self.save_to_filepath)
 
     def _save_plot(self, filepath):
         """Saves the current plot to a file.
@@ -170,7 +148,7 @@ class LossAccPlot(object):
         """
         self.fig.savefig(filepath)
 
-    def _redraw_plot(self, epoch, train_loss, train_acc, val_loss, val_acc):
+    def _redraw(self):
         """Redraws the plot with new values.
         Args:
             epoch: The index of the current epoch, starting at 0.
@@ -184,35 +162,57 @@ class LossAccPlot(object):
                 epoch (list of floats).
         """
 
-        ax1 = self.ax1
-        ax2 = self.ax2
+        if self.first_redraw and self.show_plot_window:
+            plt.figure(self.fig.number)
+            plt.show(block=False)
+            #plt.draw()
+
+        ax1 = self.ax_loss
+        ax2 = self.ax_acc
 
         # List of each epoch (x-axis)
         epochs = list(range(0, epoch+1))
 
         # Clear loss and accuracy charts
-        ax1.clear()
-        ax2.clear()
+        if ax1:
+            ax1.clear()
+        if ax2:
+            ax2.clear()
 
         # Set titles of charts (at the top)
-        ax1.set_title('loss')
-        ax2.set_title('accuracy')
+        if ax1:
+            ax1.set_title("loss")
+        if ax2:
+            ax2.set_title("accuracy")
 
         # Set the styles of the lines used in the charts
         # Different line style for epochs after the  first one, because
         # the very first epoch has only one data point and therefore no line
         # and would be invisible without the changed style.
-        linestyles = self.linestyles if epoch > 0 else self.linestyles_first_epoch
+        ls_loss_train = self.linestyles["loss_train"]
+        ls_loss_val = self.linestyles["loss_val"]
+        ls_acc_train = self.linestyles["acc_train"]
+        ls_acc_val = self.linestyles["acc_val"]
+        if len(self.values_loss_train_x) == 1:
+            ls_loss_train = self.linestyles_one_value["loss_train"]
+        if len(self.values_loss_val_x) == 1:
+            ls_loss_val = self.linestyles_one_value["loss_val"]
+        if len(self.values_acc_train_x) == 1:
+            ls_acc_train = self.linestyles_one_value["acc_train"]
+        if len(self.values_acc_val_x) == 1:
+            ls_acc_val = self.linestyles_one_value["acc_val"]
 
         # Plot the lines
-        if train_loss:
-            ax1.plot(epochs, train_loss, linestyles[0], label='train loss')
-        if val_loss:
-            ax1.plot(epochs, val_loss, linestyles[1], label='val loss')
-        if train_acc:
-            ax2.plot(epochs, train_acc, linestyles[0], label='train acc')
-        if val_acc:
-            ax2.plot(epochs, val_acc, linestyles[1], label='val acc')
+        if ax1:
+            ax1.plot(self.values_loss_train_x, self.values_loss_train_y,
+                     ls_loss_train, label="loss train")
+            ax1.plot(self.values_loss_val_x, self.values_loss_val_y,
+                     ls_loss_val, label="loss val.")
+        if ax2:
+            ax2.plot(self.values_acc_train_x, self.values_acc_train_y,
+                     ls_acc_train, label="acc. train")
+            ax2.plot(self.values_acc_val_x, self.values_acc_val_y,
+                     ls_acc_val, label="acc. val.")
 
         if self.show_regressions:
             # Compute the regression lines for the n_forward future epochs.
@@ -249,22 +249,28 @@ class LossAccPlot(object):
                                       'val acc regression')
 
         # Add legend (below chart)
-        ax1.legend(['train loss', 'val loss',
-                    'train loss regression', 'val loss regression'],
-                   bbox_to_anchor=(0.7, -0.08), ncol=2)
-        ax2.legend(['train acc', 'val acc',
-                    'train acc regression', 'val acc regression'],
-                   bbox_to_anchor=(0.7, -0.08), ncol=2)
+        if ax1:
+            ax1.legend(["loss train", "loss val.",
+                        "loss train regression", "loss val. regression"],
+                       bbox_to_anchor=(0.7, -0.08), ncol=2)
+        if ax2:
+            ax2.legend(["acc. train", "acc. val.",
+                        "acc. train regression", "acc. val. regression"],
+                       bbox_to_anchor=(0.7, -0.08), ncol=2)
 
         # Labels for x and y axis
-        ax1.set_ylabel('loss')
-        ax1.set_xlabel('epoch')
-        ax2.set_ylabel('accuracy')
-        ax2.set_xlabel('epoch')
+        if ax1:
+            ax1.set_ylabel("loss")
+            ax1.set_xlabel("epoch")
+        if ax2:
+            ax2.set_ylabel("accuracy")
+            ax2.set_xlabel("epoch")
 
         # Show a grid in both charts
-        ax1.grid(True)
-        ax2.grid(True)
+        if ax1:
+            ax1.grid(True)
+        if ax2:
+            ax2.grid(True)
 
     def plot_regression_line(self, plot_ax, data, epochs, future_epochs,
                              n_backwards, linestyle, label):
