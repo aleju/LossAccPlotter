@@ -82,15 +82,13 @@ class LossAccPlot(object):
         }
         # different linestyles for the first epoch, because there will be only
         # one value available => no line can be drawn
+        # No regression here, because regression always has at least at least
+        # two xy-points (last real value and one (or more) predicted values)
         self.linestyles_one_value = {
             "loss_train": "rs-",
-            "loss_train_regression": "r:",
             "loss_val": "b^-",
-            "loss_val_regression": "b^:",
             "acc_train": "rs-",
-            "acc_train_regression": "r:",
-            "acc_val": "b^-",
-            "acc_val_regression": "b^:"
+            "acc_val": "b^-"
         }
 
         # ----
@@ -254,10 +252,10 @@ class LossAccPlot(object):
 
         # Labels for x and y axis
         if ax1:
-            ax1.set_ylabel("loss")
+            ax1.set_ylabel("Loss")
             ax1.set_xlabel(self.x_label)
         if ax2:
-            ax2.set_ylabel("accuracy")
+            ax2.set_ylabel("Accuracy")
             ax2.set_xlabel(self.x_label)
 
         # Show a grid in both charts
@@ -277,6 +275,9 @@ class LossAccPlot(object):
         # (e.g. at epoch 100 compute 10 next, at 200 the 20 next ones...).
         n_forward = int(max((last_x + 1) * self.poly_forward_perc,
                             self.poly_forward_min))
+
+        if n_forward <= 0:
+            return ([], [])
 
         # Compute regression lines based on n_backwards epochs
         # in the past, e.g. based on the last 10 values.
@@ -299,27 +300,3 @@ class LossAccPlot(object):
         future_y = [poly(x_idx) for x_idx in future_x]
 
         return (future_x, future_y)
-
-    def plot_regression_line(self, plot_ax, data, epochs, future_epochs,
-                             n_backwards, linestyle, label):
-        """Calculates and plots a regression line.
-        Args:
-            plot_ax: The ax on which to plot the line.
-            data: The data used to perform the regression
-                (e.g. training loss values).
-            epochs: List of all epochs (0, 1, 2, ...).
-            future_epochs: List of the future epochs for which values are
-                ought to be predicted.
-            n_backwards: How far back to go in time (in epochs) in order
-                to compute the regression. (E.g. 10 = calculate it on the
-                last 10 values max.)
-            linestyle: Linestyle of the regression line.
-            label: Label of the regression line.
-        """
-        # dont try to draw anything if the data list is empty or it's the
-        # first epoch
-        if len(data) > 1:
-            poly = np.poly1d(np.polyfit(epochs[-n_backwards:],
-                                        data[-n_backwards:], self.poly_degree))
-            future_values = [poly(i) for i in future_epochs]
-            plot_ax.plot(future_epochs, future_values, linestyle, label=label)
