@@ -64,20 +64,28 @@ class LossAccPlot(object):
         self.save_to_filepath = save_to_filepath
         self.x_label = x_label
 
+        self.averages_period = 20
+
         self.poly_forward_perc=0.1,
         self.poly_backward_perc=0.2,
         self.poly_n_forward_min=5,
         self.poly_n_backward_min=10,
         self.poly_degree=1
 
+        self.grid = True
+
         self.linestyles = {
             "loss_train": "r-",
+            "loss_train_sma": "r-",
             "loss_train_regression": "r:",
             "loss_val": "b-",
+            "loss_val_sma": "b-",
             "loss_val_regression": "b:",
             "acc_train": "r-",
+            "acc_train_sma": "r-",
             "acc_train_regression": "r:",
             "acc_val": "b-",
+            "acc_val_sma": "b-",
             "acc_val_regression": "b:"
         }
         # different linestyles for the first epoch, because there will be only
@@ -170,17 +178,13 @@ class LossAccPlot(object):
         ax1 = self.ax_loss
         ax2 = self.ax_acc
 
-        # Clear loss and accuracy charts
-        if ax1:
-            ax1.clear()
-        if ax2:
-            ax2.clear()
-
-        # Set titles of charts (at the top)
-        if ax1:
-            ax1.set_title("loss")
-        if ax2:
-            ax2.set_title("accuracy")
+        for ax, label in zip([ax1, ax2], ["Loss", "Accuracy"]):
+            if ax:
+                ax.clear()
+                ax.set_title(label)
+                ax.set_ylabel(label)
+                ax.set_xlabel(self.x_label)
+                ax.grid(self.grid)
 
         # Set the styles of the lines used in the charts
         # Different line style for epochs after the  first one, because
@@ -211,6 +215,38 @@ class LossAccPlot(object):
             ax2.plot(self.values_acc_val_x, self.values_acc_val_y,
                      ls_acc_val, label="acc. val.")
 
+        # Plot moving averages
+        if self.show_averages:
+            # calculate the xy-values
+            if ax1:
+                (lt_sma_x, lt_sma_y) = self._calc_sma(self.values_loss_train_x,
+                                                      self.values_loss_train_y)
+                (lv_sma_x, lv_sma_y) = self._calc_sma(self.values_loss_val_x,
+                                                      self.values_loss_val_y)
+            if ax2:
+                (at_sma_x, at_sma_y) = self._calc_sma(self.values_acc_train_x,
+                                                      self.values_acc_train_y)
+                (av_sma_x, av_sma_y) = self._calc_sma(self.values_acc_val_x,
+                                                      self.values_acc_val_y)
+
+            # plot the xy-values
+            if ax1:
+                ax1.plot(lt_sma_x, lt_sma_y, self.linestyle["loss_train_sma"],
+                         label="train loss (SMA %d)" % (self.averages_period,),
+                         alpha=0.9)
+                ax1.plot(lv_sma_x, lv_sma_y, self.linestyle["loss_val_sma"],
+                         label="val loss (SMA %d)" % (self.averages_period,),
+                         alpha=0.9)
+
+            if ax2:
+                ax2.plot(at_sma_x, at_sma_y, self.linestyle["acc_train_sma"],
+                         label="train acc (SMA %d)" % (self.averages_period,),
+                         alpha=0.9)
+                ax2.plot(av_sma_x, av_sma_y, self.linestyle["acc_val_sma"],
+                         label="acc. val. (SMA %d)" % (self.averages_period,),
+                         alpha=0.9)
+
+        # Plot regression lines
         if self.show_regressions:
             # calculate future values for loss train (lt), loss val (lv),
             # acc train (at) and acc val (av)
@@ -226,12 +262,13 @@ class LossAccPlot(object):
                                                       self.values_acc_val_y)
 
             # plot the predicted values
-            ax1.plot(lt_regression[0], lt_regression[1],
-                     self.linestyles["loss_train_regression"],
-                     label="loss train regression")
-            ax1.plot(lv_regression[0], lv_regression[1],
-                     self.linestyles["loss_val_regression"],
-                     label="loss val. regression")
+            if ax1:
+                ax1.plot(lt_regression[0], lt_regression[1],
+                         self.linestyles["loss_train_regression"],
+                         label="loss train regression")
+                ax1.plot(lv_regression[0], lv_regression[1],
+                         self.linestyles["loss_val_regression"],
+                         label="loss val. regression")
             if ax2:
                 ax2.plot(at_regression[0], at_regression[1],
                          self.linestyles["acc_train_regression"],
@@ -240,29 +277,35 @@ class LossAccPlot(object):
                          self.linestyles["acc_val_regression"],
                          label="acc val. regression")
 
-        # Add legend (below chart)
+        # Add legends (below both chart)
+        labels = ["%CHART train", "%CHART val."]
+        if self.show_averages:
+            labels.extend(["%CHART train (SMA %d)" % (self.averages_period,),
+                           "%CHART val. (SMA %d)" % (self.averages_period,)])
+        if self.show_regression:
+            labels.extend(["%CHART train (regression)",
+                           "%CHART val. (regression)"])
+        # this could also be done via a loop over zip(["loss", "acc"], [ax1, ax2])
         if ax1:
-            ax1.legend(["loss train", "loss val.",
-                        "loss train regression", "loss val. regression"],
-                       bbox_to_anchor=(0.7, -0.08), ncol=2)
+            ax1.legend([label.replace("%CHART", "loss") for label in labels],
+                       bbox_to_anchor=(0.7, -0.08), ncol=2))
         if ax2:
-            ax2.legend(["acc. train", "acc. val.",
-                        "acc. train regression", "acc. val. regression"],
-                       bbox_to_anchor=(0.7, -0.08), ncol=2)
+            ax2.legend([label.replace("%CHART", "acc.") for label in labels],
+                       bbox_to_anchor=(0.7, -0.08), ncol=2))
 
-        # Labels for x and y axis
-        if ax1:
-            ax1.set_ylabel("Loss")
-            ax1.set_xlabel(self.x_label)
-        if ax2:
-            ax2.set_ylabel("Accuracy")
-            ax2.set_xlabel(self.x_label)
-
-        # Show a grid in both charts
-        if ax1:
-            ax1.grid(True)
-        if ax2:
-            ax2.grid(True)
+    def _calc_sma(self, x_values, y_values):
+        result_x, result_y, last_ys = [], [], []
+        running_sum = 0
+        period = self.averages_period
+        # use a running sum here instead of avg(), should be slightly faster
+        for y_val in y_values:
+            last_ys.append(y_val)
+            running_sum += y_val
+            if len(last_ys) > period:
+                poped_y = last_ys.pop(0)
+                running_sum -= poped_y
+            result_y.append(float(running_sum) / float(len(last_ys)))
+        return (x_values, result_y)
 
     def _calc_regression(self, x_values, y_values):
         if not x_values:
