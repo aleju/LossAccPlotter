@@ -4,7 +4,20 @@ from __future__ import print_function
 import matplotlib.pyplot as plt
 import numpy as np
 from six.moves import range
+import warnings
+import math
 
+def ignore_nan_and_inf(value, label, x_index):
+    if value is None:
+        return None
+    elif math.isnan(value):
+        warnings.warn("Got NaN for value '%s' at x-index %d" % (label, x_index))
+        return None
+    elif math.isinf(value):
+        warnings.warn("Got INF for value '%s' at x-index %d" % (label, x_index))
+        return None
+    else:
+        return value
 
 class LossAccPlotter(object):
     """Class to plot training and validation loss and accuracy.
@@ -130,6 +143,13 @@ class LossAccPlotter(object):
 
     def add_values(self, x_index, loss_train=None, loss_val=None, acc_train=None,
                    acc_val=None, redraw=True):
+        assert isinstance(x_index, (int, long))
+
+        loss_train = ignore_nan_and_inf(loss_train, "loss train", x_index)
+        loss_val = ignore_nan_and_inf(loss_val, "loss val", x_index)
+        acc_train = ignore_nan_and_inf(acc_train, "acc train", x_index)
+        acc_val = ignore_nan_and_inf(acc_val, "acc val", x_index)
+
         if loss_train is not None:
             self.values_loss_train_x.append(x_index)
             self.values_loss_train_y.append(loss_train)
@@ -335,7 +355,7 @@ class LossAccPlotter(object):
         return (x_values, result_y)
 
     def _calc_regression(self, x_values, y_values):
-        if not x_values:
+        if not x_values or len(x_values) < 2:
             return ([], [])
 
         last_x = x_values[-1]
@@ -357,6 +377,9 @@ class LossAccPlotter(object):
         n_backwards = int(max((last_x + 1) * self.poly_backward_perc,
                               self.poly_n_backward_min))
 
+        #print("n_backwards", n_backwards)
+        #print("x_values", x_values[-n_backwards:])
+        #print("y_values", y_values[-n_backwards:])
         fit = np.polyfit(x_values[-n_backwards:], y_values[-n_backwards:],
                          self.poly_degree)
         poly = np.poly1d(fit)
