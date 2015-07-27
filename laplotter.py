@@ -120,7 +120,7 @@ class LossAccPlotter(object):
             self.ax_loss = ax1
             self.ax_acc = ax2
         else:
-            fig, (ax,) = plt.subplots(ncols=1, figsize=(12, 8))
+            fig, ax = plt.subplots(ncols=1, figsize=(12, 8))
             self.fig = fig
             self.ax_loss = ax if show_loss_plot else None
             self.ax_acc = ax if show_acc_plot else None
