@@ -210,26 +210,26 @@ class LossAccPlotter(object):
                 ax.set_xlabel(self.x_label)
                 ax.grid(self.grid)
 
+        # Plot main lines, their averages and the regressions (predictions)
+        self._redraw_main_lines()
+        self._redraw_averages()
+        self._redraw_regressions()
+        
         # Add legends (below both chart)
         labels = ["$CHART train", "$CHART val."]
         if self.show_averages:
-            labels.extend(["$CHART train (SMA %d)" % (self.averages_period,),
-                           "$CHART val. (SMA %d)" % (self.averages_period,)])
+            labels.extend(["$CHART train (avg %d)" % (self.averages_period,),
+                           "$CHART val. (avg %d)" % (self.averages_period,)])
         if self.show_regressions:
             labels.extend(["$CHART train (regression)",
                            "$CHART val. (regression)"])
 
         if ax1:
             ax1.legend([label.replace("$CHART", "loss") for label in labels],
-                       bbox_to_anchor=(0.7, -0.08), ncol=2)
+                       bbox_to_anchor=(0.9, -0.08), ncol=3)
         if ax2:
             ax2.legend([label.replace("$CHART", "acc.") for label in labels],
-                       bbox_to_anchor=(0.7, -0.08), ncol=2)
-
-        # Plot main lines, their averages and the regressions (predictions)
-        self._redraw_main_lines()
-        self._redraw_averages()
-        self._redraw_regressions()
+                       bbox_to_anchor=(0.9, -0.08), ncol=3)
 
     def _redraw_main_lines(self):
         ax1 = self.ax_loss
