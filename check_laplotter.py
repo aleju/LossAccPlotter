@@ -6,6 +6,13 @@ import numpy as np
 def main():
     print("")
     print("------------------")
+    print("1 datapoint")
+    print("------------------")
+    (loss_train, loss_val, acc_train, acc_val) = create_values(1)
+    show_chart(loss_train, loss_val, acc_train, acc_val)
+
+    print("")
+    print("------------------")
     print("150 datapoints")
     print("No accuracy chart")
     print("------------------")
@@ -29,6 +36,24 @@ def main():
     print("------------------")
     (_, loss_val, _, acc_val) = create_values(150)
     show_chart(np.array([]), loss_val, np.array([]), acc_val)
+
+    print("")
+    print("------------------")
+    print("150 datapoints")
+    print("No regressions")
+    print("------------------")
+    (loss_train, loss_val, acc_train, acc_val) = create_values(150)
+    show_chart(loss_train, loss_val, acc_train, acc_val,
+               lap=LossAccPlotter(show_regressions=False))
+    
+    print("")
+    print("------------------")
+    print("150 datapoints")
+    print("No averages")
+    print("------------------")
+    (loss_train, loss_val, acc_train, acc_val) = create_values(150)
+    show_chart(loss_train, loss_val, acc_train, acc_val,
+               lap=LossAccPlotter(show_averages=False))
 
     print("")
     print("------------------")

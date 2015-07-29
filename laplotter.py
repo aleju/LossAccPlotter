@@ -216,20 +216,23 @@ class LossAccPlotter(object):
         self._redraw_regressions()
         
         # Add legends (below both chart)
+        ncol = 1
         labels = ["$CHART train", "$CHART val."]
         if self.show_averages:
             labels.extend(["$CHART train (avg %d)" % (self.averages_period,),
                            "$CHART val. (avg %d)" % (self.averages_period,)])
+            ncol += 1
         if self.show_regressions:
             labels.extend(["$CHART train (regression)",
                            "$CHART val. (regression)"])
+            ncol += 1
 
         if ax1:
             ax1.legend([label.replace("$CHART", "loss") for label in labels],
-                       bbox_to_anchor=(0.9, -0.08), ncol=3)
+                       bbox_to_anchor=(0.9, -0.08), ncol=ncol)
         if ax2:
             ax2.legend([label.replace("$CHART", "acc.") for label in labels],
-                       bbox_to_anchor=(0.9, -0.08), ncol=3)
+                       bbox_to_anchor=(0.9, -0.08), ncol=ncol)
 
     def _redraw_main_lines(self):
         ax1 = self.ax_loss
