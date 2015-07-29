@@ -9,7 +9,8 @@ def main():
     print("1 datapoint")
     print("------------------")
     (loss_train, loss_val, acc_train, acc_val) = create_values(1)
-    show_chart(loss_train, loss_val, acc_train, acc_val)
+    show_chart(loss_train, loss_val, acc_train, acc_val,
+               title="A single datapoint")
 
     print("")
     print("------------------")
@@ -18,7 +19,8 @@ def main():
     print("------------------")
     (loss_train, loss_val, _, _) = create_values(150)
     show_chart(loss_train, loss_val, np.array([]), np.array([]),
-               lap=LossAccPlotter(show_acc_plot=False))
+               lap=LossAccPlotter(show_acc_plot=False),
+               title="150 datapoints, no accuracy chart")
 
     print("")
     print("------------------")
@@ -27,7 +29,8 @@ def main():
     print("------------------")
     (_, _, acc_train, acc_val) = create_values(150)
     show_chart(np.array([]), np.array([]), acc_train, acc_val,
-               lap=LossAccPlotter(show_loss_plot=False))
+               lap=LossAccPlotter(show_loss_plot=False),
+               title="150 datapoints, no loss chart")
     
     print("")
     print("------------------")
@@ -35,7 +38,8 @@ def main():
     print("Only validation values (no training lines)")
     print("------------------")
     (_, loss_val, _, acc_val) = create_values(150)
-    show_chart(np.array([]), loss_val, np.array([]), acc_val)
+    show_chart(np.array([]), loss_val, np.array([]), acc_val,
+               title="150 datapoints, only validation (no training)")
 
     print("")
     print("------------------")
@@ -44,7 +48,8 @@ def main():
     print("------------------")
     (loss_train, loss_val, acc_train, acc_val) = create_values(150)
     show_chart(loss_train, loss_val, acc_train, acc_val,
-               lap=LossAccPlotter(show_regressions=False))
+               lap=LossAccPlotter(show_regressions=False),
+               title="150 datapoints, regressions deactivated")
     
     print("")
     print("------------------")
@@ -53,7 +58,8 @@ def main():
     print("------------------")
     (loss_train, loss_val, acc_train, acc_val) = create_values(150)
     show_chart(loss_train, loss_val, acc_train, acc_val,
-               lap=LossAccPlotter(show_averages=False))
+               lap=LossAccPlotter(show_averages=False),
+               title="150 datapoints, averages deactivated")
 
     print("")
     print("------------------")
@@ -65,7 +71,8 @@ def main():
 
     loss_train[5] = float("nan")
     
-    show_chart(loss_train, loss_val, acc_train, acc_val)
+    show_chart(loss_train, loss_val, acc_train, acc_val,
+               title="150 datapoints, one having value NaN (loss train at x=5)")
     
     print("")
     print("------------------")
@@ -88,7 +95,8 @@ def main():
     loss_val[set_to_none_indices] = -1.0
     acc_val[set_to_none_indices] = -1.0
 
-    show_chart(loss_train, loss_val, acc_train, acc_val)
+    show_chart(loss_train, loss_val, acc_train, acc_val,
+               title="1000 training datapoints, but only 100 validation datapoints")
 
 def create_values(nb_points):
     lt = add_noise(np.linspace(0.8, 0.1, num=nb_points), 0.05)
@@ -100,8 +108,10 @@ def create_values(nb_points):
 def add_noise(values, scale):
     return values + np.random.normal(scale=scale, size=values.shape[0])
 
-def show_chart(loss_train, loss_val, acc_train, acc_val, lap=None):
+def show_chart(loss_train, loss_val, acc_train, acc_val, lap=None, title=None):
     lap = LossAccPlotter() if lap is None else lap
+    if title is not None:
+        lap.title = title
 
     for idx in range(loss_train.shape[0]):
         lt = loss_train[idx] if loss_train[idx] != -1.0 else None
@@ -116,7 +126,7 @@ def show_chart(loss_train, loss_val, acc_train, acc_val, lap=None):
         av = acc_val[idx] if acc_val[idx] != -1.0 else None
         lap.add_values(idx, acc_val=av, redraw=False)
 
-    lap._redraw()
+    lap.redraw()
     
     print("Close the chart to continue.")
     lap.block()

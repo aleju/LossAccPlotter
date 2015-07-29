@@ -23,6 +23,7 @@ class LossAccPlotter(object):
     """Class to plot training and validation loss and accuracy.
     """
     def __init__(self,
+                 title=None,
                  save_to_filepath=None,
                  show_regressions=True,
                  show_averages=True,
@@ -67,6 +68,8 @@ class LossAccPlotter(object):
         assert show_loss_plot or show_acc_plot
         assert save_to_filepath is not None or show_plot_window
 
+        self.title = title
+        self.title_fontsize = 14
         self.show_regressions = show_regressions
         self.show_averages = show_averages
         self.show_loss_plot = show_loss_plot
@@ -81,6 +84,8 @@ class LossAccPlotter(object):
         self.poly_backward_perc = 0.2
         self.poly_n_forward_min = 5
         self.poly_n_backward_min = 10
+        self.poly_n_forward_max = 100
+        self.poly_n_backward_max = 100
         self.poly_degree= 1
 
         self.grid = True
@@ -110,27 +115,11 @@ class LossAccPlotter(object):
             "acc_val": "b^-"
         }
 
-        # ----
-        # Initialize plots
-        # ----
-        self.first_redraw = True
-        if show_loss_plot and show_acc_plot:
-            fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(24, 8))
-            self.fig = fig
-            self.ax_loss = ax1
-            self.ax_acc = ax2
-        else:
-            fig, ax = plt.subplots(ncols=1, figsize=(12, 8))
-            self.fig = fig
-            self.ax_loss = ax if show_loss_plot else None
-            self.ax_acc = ax if show_acc_plot else None
-
-        # set_position is neccessary here in order to place the legend properly
-        for ax in [self.ax_loss, self.ax_acc]:
-            if ax is not None:
-                box = ax.get_position()
-                ax.set_position([box.x0, box.y0 + box.height * 0.1,
-                                 box.width, box.height * 0.9])
+        # these values will be set in _initialize_plot() upon the first call
+        # of redraw()
+        self.fig = None
+        self.ax_loss = None
+        self.ax_acc = None
 
         self.values_loss_train_x = []
         self.values_loss_val_x = []
@@ -164,7 +153,7 @@ class LossAccPlotter(object):
             self.values_acc_val_y.append(acc_val)
 
         if redraw:
-            self._redraw()
+            self.redraw()
             if self.save_to_filepath:
                 self._save_plot(self.save_to_filepath)
 
@@ -180,7 +169,30 @@ class LossAccPlotter(object):
         """
         self.fig.savefig(filepath)
 
-    def _redraw(self):
+    def _initialize_plot(self):
+        if self.show_loss_plot and self.show_acc_plot:
+            fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(24, 8))
+            self.fig = fig
+            self.ax_loss = ax1
+            self.ax_acc = ax2
+        else:
+            fig, ax = plt.subplots(ncols=1, figsize=(12, 8))
+            self.fig = fig
+            self.ax_loss = ax if self.show_loss_plot else None
+            self.ax_acc = ax if self.show_acc_plot else None
+
+        # set_position is neccessary here in order to make space at the bottom
+        # for the legend
+        for ax in [self.ax_loss, self.ax_acc]:
+            if ax is not None:
+                box = ax.get_position()
+                ax.set_position([box.x0, box.y0 + box.height * 0.1,
+                                 box.width, box.height * 0.9])
+
+        if self.show_plot_window:
+            plt.show(block=False)
+
+    def redraw(self):
         """Redraws the plot with new values.
         Args:
             epoch: The index of the current epoch, starting at 0.
@@ -193,11 +205,15 @@ class LossAccPlotter(object):
             val_acc: All of the validation accuracy values of each
                 epoch (list of floats).
         """
+        if self.fig is None:
+            self._initialize_plot()
+        plt.figure(self.fig.number)
 
-        if self.first_redraw and self.show_plot_window:
-            plt.figure(self.fig.number)
-            plt.show(block=False)
-            #plt.draw()
+        # putting title into the redraw method instead of into _initialize_plot()
+        # allows for changing the title regularly, e.g. to show the current
+        # epoch number or best achieved values.
+        if self.title is not None:
+            self.fig.suptitle(self.title, fontsize=self.title_fontsize)
 
         ax1 = self.ax_loss
         ax2 = self.ax_acc
@@ -214,7 +230,7 @@ class LossAccPlotter(object):
         self._redraw_main_lines()
         self._redraw_averages()
         self._redraw_regressions()
-        
+
         # Add legends (below both chart)
         ncol = 1
         labels = ["$CHART train", "$CHART val."]
@@ -229,12 +245,17 @@ class LossAccPlotter(object):
 
         if ax1:
             ax1.legend([label.replace("$CHART", "loss") for label in labels],
-                       bbox_to_anchor=(0.9, -0.08), ncol=ncol)
+                       loc="upper center",
+                       bbox_to_anchor=(0.5, -0.08),
+                       ncol=ncol)
         if ax2:
             ax2.legend([label.replace("$CHART", "acc.") for label in labels],
-                       bbox_to_anchor=(0.9, -0.08), ncol=ncol)
+                       loc="upper center",
+                       bbox_to_anchor=(0.5, -0.08),
+                       ncol=ncol)
 
     def _redraw_main_lines(self):
+        handles = []
         ax1 = self.ax_loss
         ax2 = self.ax_acc
 
@@ -256,92 +277,108 @@ class LossAccPlotter(object):
             ls_acc_val = self.linestyles_one_value["acc_val"]
 
         # Plot the lines
-        alpha_main = 0.5 if self.show_averages else 0.9
+        alpha_main = 0.5 if self.show_averages else 0.8
         if ax1:
-            ax1.plot(self.values_loss_train_x, self.values_loss_train_y,
-                     ls_loss_train, label="loss train", alpha=alpha_main)
-            ax1.plot(self.values_loss_val_x, self.values_loss_val_y,
-                     ls_loss_val, label="loss val.", alpha=alpha_main)
+            h_lt, = ax1.plot(self.values_loss_train_x, self.values_loss_train_y,
+                             ls_loss_train, label="loss train", alpha=alpha_main)
+            h_lv, = ax1.plot(self.values_loss_val_x, self.values_loss_val_y,
+                             ls_loss_val, label="loss val.", alpha=alpha_main)
+            handles.extend([h_lt, h_lv])
         if ax2:
-            ax2.plot(self.values_acc_train_x, self.values_acc_train_y,
-                     ls_acc_train, label="acc. train", alpha=alpha_main)
-            ax2.plot(self.values_acc_val_x, self.values_acc_val_y,
-                     ls_acc_val, label="acc. val.", alpha=alpha_main)
-    
+            h_at, = ax2.plot(self.values_acc_train_x, self.values_acc_train_y,
+                             ls_acc_train, label="acc. train", alpha=alpha_main)
+            h_av, = ax2.plot(self.values_acc_val_x, self.values_acc_val_y,
+                             ls_acc_val, label="acc. val.", alpha=alpha_main)
+            handles.extend([h_at, h_av])
+
+        return handles
+
     def _redraw_averages(self):
-        if self.show_averages:
-            ax1 = self.ax_loss
-            ax2 = self.ax_acc
-        
-            # calculate the xy-values
-            if ax1:
-                (lt_sma_x, lt_sma_y) = self._calc_sma(self.values_loss_train_x,
-                                                      self.values_loss_train_y)
-                (lv_sma_x, lv_sma_y) = self._calc_sma(self.values_loss_val_x,
-                                                      self.values_loss_val_y)
-            if ax2:
-                (at_sma_x, at_sma_y) = self._calc_sma(self.values_acc_train_x,
-                                                      self.values_acc_train_y)
-                (av_sma_x, av_sma_y) = self._calc_sma(self.values_acc_val_x,
-                                                      self.values_acc_val_y)
+        if not self.show_averages:
+            return []
 
-            # plot the xy-values
-            alpha_sma = 0.9
-            if ax1:
-                ax1.plot(lt_sma_x, lt_sma_y, self.linestyles["loss_train_sma"],
-                         label="train loss (SMA %d)" % (self.averages_period,),
-                         alpha=alpha_sma)
-                ax1.plot(lv_sma_x, lv_sma_y, self.linestyles["loss_val_sma"],
-                         label="val loss (SMA %d)" % (self.averages_period,),
-                         alpha=alpha_sma)
-
-            if ax2:
-                ax2.plot(at_sma_x, at_sma_y, self.linestyles["acc_train_sma"],
-                         label="train acc (SMA %d)" % (self.averages_period,),
-                         alpha=alpha_sma)
-                ax2.plot(av_sma_x, av_sma_y, self.linestyles["acc_val_sma"],
-                         label="acc. val. (SMA %d)" % (self.averages_period,),
-                         alpha=alpha_sma)
+        handles = []
+        ax1 = self.ax_loss
+        ax2 = self.ax_acc
     
+        # calculate the xy-values
+        if ax1:
+            (lt_sma_x, lt_sma_y) = self._calc_sma(self.values_loss_train_x,
+                                                  self.values_loss_train_y)
+            (lv_sma_x, lv_sma_y) = self._calc_sma(self.values_loss_val_x,
+                                                  self.values_loss_val_y)
+        if ax2:
+            (at_sma_x, at_sma_y) = self._calc_sma(self.values_acc_train_x,
+                                                  self.values_acc_train_y)
+            (av_sma_x, av_sma_y) = self._calc_sma(self.values_acc_val_x,
+                                                  self.values_acc_val_y)
+
+        # plot the xy-values
+        alpha_sma = 0.9
+        if ax1:
+            h_lt, = ax1.plot(lt_sma_x, lt_sma_y, self.linestyles["loss_train_sma"],
+                             label="train loss (SMA %d)" % (self.averages_period,),
+                             alpha=alpha_sma)
+            h_lv, = ax1.plot(lv_sma_x, lv_sma_y, self.linestyles["loss_val_sma"],
+                             label="val loss (SMA %d)" % (self.averages_period,),
+                             alpha=alpha_sma)
+            handles.extend([h_lt, h_lv])
+        if ax2:
+            h_at, = ax2.plot(at_sma_x, at_sma_y, self.linestyles["acc_train_sma"],
+                             label="train acc (SMA %d)" % (self.averages_period,),
+                             alpha=alpha_sma)
+            h_av, = ax2.plot(av_sma_x, av_sma_y, self.linestyles["acc_val_sma"],
+                             label="acc. val. (SMA %d)" % (self.averages_period,),
+                             alpha=alpha_sma)
+            handles.extend([h_at, h_av])
+
+        return handles
+
     def _redraw_regressions(self):
-        if self.show_regressions:
-            ax1 = self.ax_loss
-            ax2 = self.ax_acc
+        if not self.show_regressions:
+            return []
 
-            # calculate future values for loss train (lt), loss val (lv),
-            # acc train (at) and acc val (av)
-            if ax1:
-                lt_regression = self._calc_regression(self.values_loss_train_x,
-                                                      self.values_loss_train_y)
-                lv_regression = self._calc_regression(self.values_loss_val_x,
-                                                      self.values_loss_val_y)
-            # predicting accuracy values isnt necessary if theres no acc chart
-            if ax2:
-                at_regression = self._calc_regression(self.values_acc_train_x,
-                                                      self.values_acc_train_y)
-                av_regression = self._calc_regression(self.values_acc_val_x,
-                                                      self.values_acc_val_y)
+        handles = []
+        ax1 = self.ax_loss
+        ax2 = self.ax_acc
 
-            # plot the predicted values
-            alpha_regression = 0.9
-            if ax1:
-                ax1.plot(lt_regression[0], lt_regression[1],
-                         self.linestyles["loss_train_regression"],
-                         label="loss train regression",
-                         alpha=alpha_regression)
-                ax1.plot(lv_regression[0], lv_regression[1],
-                         self.linestyles["loss_val_regression"],
-                         label="loss val. regression",
-                         alpha=alpha_regression)
-            if ax2:
-                ax2.plot(at_regression[0], at_regression[1],
-                         self.linestyles["acc_train_regression"],
-                         label="acc train regression",
-                         alpha=alpha_regression)
-                ax2.plot(av_regression[0], av_regression[1],
-                         self.linestyles["acc_val_regression"],
-                         label="acc val. regression",
-                         alpha=alpha_regression)
+        # calculate future values for loss train (lt), loss val (lv),
+        # acc train (at) and acc val (av)
+        if ax1:
+            lt_regression = self._calc_regression(self.values_loss_train_x,
+                                                  self.values_loss_train_y)
+            lv_regression = self._calc_regression(self.values_loss_val_x,
+                                                  self.values_loss_val_y)
+        # predicting accuracy values isnt necessary if theres no acc chart
+        if ax2:
+            at_regression = self._calc_regression(self.values_acc_train_x,
+                                                  self.values_acc_train_y)
+            av_regression = self._calc_regression(self.values_acc_val_x,
+                                                  self.values_acc_val_y)
+
+        # plot the predicted values
+        alpha_regression = 0.9
+        if ax1:
+            h_lt, = ax1.plot(lt_regression[0], lt_regression[1],
+                             self.linestyles["loss_train_regression"],
+                             label="loss train regression",
+                             alpha=alpha_regression)
+            h_lv, = ax1.plot(lv_regression[0], lv_regression[1],
+                             self.linestyles["loss_val_regression"],
+                             label="loss val. regression",
+                             alpha=alpha_regression)
+        if ax2:
+            h_at, = ax2.plot(at_regression[0], at_regression[1],
+                             self.linestyles["acc_train_regression"],
+                             label="acc train regression",
+                             alpha=alpha_regression)
+            h_av, = ax2.plot(av_regression[0], av_regression[1],
+                             self.linestyles["acc_val_regression"],
+                             label="acc val. regression",
+                             alpha=alpha_regression)
+            handles.extend([h_at, h_av])
+
+        return handles
 
     def _calc_sma(self, x_values, y_values):
         result_x, result_y, last_ys = [], [], []
@@ -362,28 +399,33 @@ class LossAccPlotter(object):
             return ([], [])
 
         last_x = x_values[-1]
-
-        # Compute the regression lines for the n_forward future epochs.
-        # n_forward is calculated relative to the current epoch
-        # (e.g. at epoch 100 compute 10 next, at 200 the 20 next ones...).
-        n_forward = int(max((last_x + 1) * self.poly_forward_perc,
-                            self.poly_n_forward_min))
-
-        if n_forward <= 0:
-            return ([], [])
+        nb_values = len(x_values)
 
         # Compute regression lines based on n_backwards epochs
         # in the past, e.g. based on the last 10 values.
         # n_backwards is calculated relative to the current epoch
         # (e.g. at epoch 100 compute based on the last 10 values,
         # at 200 based on the last 20 values...).
-        n_backwards = int(max((last_x + 1) * self.poly_backward_perc,
-                              self.poly_n_backward_min))
+        #n_backward = int((last_x + 1) * self.poly_backward_perc)
+        n_backward = int(nb_values * self.poly_backward_perc)
+        n_backward = max(n_backward, self.poly_n_backward_min)
+        n_backward = min(n_backward, self.poly_n_backward_max)
+
+        # Compute the regression lines for the n_forward future epochs.
+        # n_forward is calculated relative to the current epoch
+        # (e.g. at epoch 100 compute 10 next, at 200 the 20 next ones...).
+        #n_forward = int((last_x + 1) * self.poly_forward_perc)
+        n_forward = int(nb_values * self.poly_forward_perc)
+        n_forward = max(n_forward, self.poly_n_forward_min)
+        n_forward = min(n_forward, self.poly_n_forward_max)
+
+        if n_backward <= 0 and n_forward <= 0:
+            return ([], [])
 
         #print("n_backwards", n_backwards)
         #print("x_values", x_values[-n_backwards:])
         #print("y_values", y_values[-n_backwards:])
-        fit = np.polyfit(x_values[-n_backwards:], y_values[-n_backwards:],
+        fit = np.polyfit(x_values[-n_backward:], y_values[-n_backward:],
                          self.poly_degree)
         poly = np.poly1d(fit)
 
