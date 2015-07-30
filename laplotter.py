@@ -3,11 +3,20 @@ from __future__ import print_function
 
 import matplotlib.pyplot as plt
 import numpy as np
-from six.moves import range
 import warnings
 import math
 
 def ignore_nan_and_inf(value, label, x_index):
+    """Helper function that creates warnings on NaN/INF and converts them to None.
+    Args:
+        value: The value to check for NaN/INF.
+        label: For which line the value was used (usually "loss train", "loss val", ...)
+            This is used in the warning message.
+        x_index: At which x-index the value was used (e.g. 1 as in Epoch 1).
+            This is used in the warning message.
+    Returns:
+        value, but None if value is NaN or INF.
+    """
     if value is None:
         return None
     elif math.isnan(value):
@@ -20,8 +29,7 @@ def ignore_nan_and_inf(value, label, x_index):
         return value
 
 class LossAccPlotter(object):
-    """Class to plot training and validation loss and accuracy.
-    """
+    """Class to plot loss and accuracy charts (for training and validation data)."""
     def __init__(self,
                  title=None,
                  save_to_filepath=None,
@@ -33,37 +41,29 @@ class LossAccPlotter(object):
                  x_label="Epoch"):
         """Constructs the plotter.
         Args:
-            save_to_filepath: The filepath to a file at which the plot
-                is ought to be saved, e.g. "/tmp/last_plot.png". Set this value
-                to None if you don't want to save the plot.
+            title: An optional title which will be shown at the top of the
+                plot. E.g. the name of the experiment or some info about it.
+                If set to None, no title will be shown. (Default is None.)
+            save_to_filepath: The path to a file in which the plot will be saved,
+                e.g. "/tmp/last_plot.png". If set to None, the chart will not be
+                saved to a file. (Default is None.)
+            show_regressions: Whether or not to show a regression, indicating
+                where each line might end up in the future.
+            show_averages: Whether to plot moving averages in the charts for
+                each line (so for loss train, loss val, ...). This value may
+                only be True or False. To change the interval (default is 20
+                epochs), change the instance variable "averages_period" to the new
+                integer value. (Default is True.)
+            show_loss_plot: Whether to show the chart for the loss values. If
+                set to False, only the accuracy chart will be shown. (Default
+                is True.)
+            show_acc_plot: Whether to show the chart for the accuracy value. If
+                set to False, only the loss chart will be shown. (Default is True.)
             show_plot_window: Whether to show the plot in a window (True)
                 or hide it (False). Hiding it makes only sense if you
-                set save_to_filepath.
-            linestyles: List of two string values containing the stylings
-                of the chart lines. The first value is for the training
-                line, the second for the validation line. Loss and accuracy
-                charts will both use that styling.
-            linestyles_first_epoch: Different stylings for the chart lines
-                for the very first epoch (no two points yet to draw a line).
-            show_regression: Whether or not to show a regression, indicating
-                where each line might end up in the future.
-            poly_forward_perc: Percentage value (e.g. 0.1 = 10%) indicating
-                for how far in the future each regression line will be
-                calculated. The percentage is relative to the current epoch.
-                E.g. if epoch is 100 and this value is 0.2, then the regression
-                will be calculated for 20 values in the future.
-            poly_backward_perc: Similar to poly_forward_perc. Percentage of
-                the data basis to use in order to calculate the regression.
-                E.g. if epoch is 100 and this value is 0.2, then the last
-                20 values will be used to predict the future values.
-            poly_n_forward_min: Minimum value for how far in the future
-                the regression values will be predicted for each line.
-                E.g. 10 means that there will always be at least 10 predicted
-                values, even for e.g. epoch 5.
-            poly_n_backward_min: Similar to poly_n_forward_min. Minimum
-                epochs to use backwards for predicting future values.
-            poly_degree: Degree of the polynomial to use when predicting
-                future values. Should usually be 1.
+                set save_to_filepath. (Default is True.)
+            x_label: Label on the x-axes of the charts. Reasonable choices
+                would be: "Epoch", "Batch" or "Example". (Default is "Epoch".)
         """
         assert show_loss_plot or show_acc_plot
         assert save_to_filepath is not None or show_plot_window
@@ -78,18 +78,23 @@ class LossAccPlotter(object):
         self.save_to_filepath = save_to_filepath
         self.x_label = x_label
 
+        # the interval for the moving averages, e.g. 20 = average over 20 epochs
         self.averages_period = 20
 
+        # these values deal with the regression
         self.poly_forward_perc = 0.1
         self.poly_backward_perc = 0.2
         self.poly_n_forward_min = 5
         self.poly_n_backward_min = 10
         self.poly_n_forward_max = 100
         self.poly_n_backward_max = 100
-        self.poly_degree= 1
+        self.poly_degree = 1
 
+        # whether to show grids in both charts
         self.grid = True
 
+        # the styling of the lines
+        # sma = simple moving average
         self.linestyles = {
             "loss_train": "r-",
             "loss_train_sma": "r-",
@@ -104,10 +109,13 @@ class LossAccPlotter(object):
             "acc_val_sma": "b-",
             "acc_val_regression": "b:"
         }
-        # different linestyles for the first epoch, because there will be only
-        # one value available => no line can be drawn
+        # different linestyles for the first epoch (if only one value is available),
+        # because no line can then be drawn (needs 2+ points) and only symbols will
+        # be shown.
         # No regression here, because regression always has at least at least
-        # two xy-points (last real value and one (or more) predicted values)
+        # two xy-points (last real value and one (or more) predicted values).
+        # No averages here, because the average over one value would be identical
+        # to the value anyways.
         self.linestyles_one_value = {
             "loss_train": "rs-",
             "loss_val": "b^-",
@@ -117,10 +125,17 @@ class LossAccPlotter(object):
 
         # these values will be set in _initialize_plot() upon the first call
         # of redraw()
+        # fig: the figure of the whole plot
+        # ax_loss: loss chart (left)
+        # ax_acc: accuracy chart (right)
         self.fig = None
         self.ax_loss = None
         self.ax_acc = None
 
+        # lists for the values of each line
+        # might be reasonable to change this to ordered dictionaries of
+        # the form x => y, to prevent multiple values with the same x-coordinate
+        # (per line)
         self.values_loss_train_x = []
         self.values_loss_val_x = []
         self.values_acc_train_x = []
@@ -132,6 +147,43 @@ class LossAccPlotter(object):
 
     def add_values(self, x_index, loss_train=None, loss_val=None, acc_train=None,
                    acc_val=None, redraw=True):
+        """Function to add new values for each line for a specific x-value (e.g.
+        a specific epoch).
+        
+        Meaning of the values / lines:
+         - loss_train: y-value of the loss function applied to the training set.
+         - loss_val:   y-value of the loss function applied to the validation set.
+         - acc_train:  y-value of the accuracy (e.g. 0.0 to 1.0) when measured on
+                       the training set.
+         - acc_val:    y-value of the accuracy (e.g. 0.0 to 1.0) when measured on
+                       the validation set.
+        
+        Values that are None will be ignored.
+        Values that are INF or NaN will be ignored, but create a warning.
+        
+        It is currently assumed that added values follow logically after
+        each other, so the x_index might be first 1, then 2, then 3, ...
+        instead of 10, 11, 5, 7, ...
+        If that is not the case, you will get problems with the calculation
+        of the regression.
+        
+        Args:
+            x_index: The x-coordinate, e.g. x_index=5 might represent Epoch 5.
+            loss_train: The y-value of the loss train line at the given x_index.
+                If None, no value for the loss train line will be added at
+                the given x_index. (Default is None.)
+            loss_val: Same as loss_train for the loss validation line.
+                (Default is None.)
+            acc_train: Same as loss_train for the accuracy train line.
+                (Default is None.)
+            acc_val: Same as loss_train for the accuracy validation line.
+                (Default is None.)
+            redraw: Whether to redraw the plot immediatly after receiving the
+                new values. This is reasonable if you add values once at the end
+                of every epoch. If you add many values in a row, set this to
+                False and call redraw() at the end (significantly faster).
+                (Default is True.)
+        """
         assert isinstance(x_index, (int, long))
 
         loss_train = ignore_nan_and_inf(loss_train, "loss train", x_index)
@@ -154,22 +206,45 @@ class LossAccPlotter(object):
 
         if redraw:
             self.redraw()
-            if self.save_to_filepath:
-                self._save_plot(self.save_to_filepath)
+            
 
     def block(self):
+        """Function to show the plot in a blocking way.
+        
+        This should be called at the end of your program. Otherwise the
+        chart will be closed automatically (at the end).
+        By default, the plot is shown in a non-blocking way, so that the
+        program continues execution, which causes it to close automatically
+        when the program finishes.
+        
+        This function will silently do nothing if show_plot_window was set
+        to False in the constructor.
+        """
         if self.show_plot_window:
             plt.figure(self.fig.number)
             plt.show()
 
-    def _save_plot(self, filepath):
+    def save_plot(self, filepath=None):
         """Saves the current plot to a file.
+        This function will automatically be called upon redraw.
+        This function will silently do nothing if save_to_filepath was not
+        set in the constructor, unless the parameter filepath was set to some
+        value.
+        
         Args:
-            filepath: The path to the file, e.g. "/tmp/last_plot.png".
+            filepath: The path to the file, e.g. "/tmp/last_plot.png". If set
+                to None, the filepath that was set in the constructor will be
+                used. If that was also None, the function will do nothing.
+                (Default is None.)
         """
-        self.fig.savefig(filepath)
+        if self.save_to_filepath is not None:
+            self.fig.savefig(self.save_to_filepath)
+        elif filepath is not None:
+            self.fig.savefig(filepath)
 
     def _initialize_plot(self):
+        """Creates empty figure and axes of the plot and shows it in a new window.
+        """
         if self.show_loss_plot and self.show_acc_plot:
             fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(24, 8))
             self.fig = fig
@@ -193,7 +268,12 @@ class LossAccPlotter(object):
             plt.show(block=False)
 
     def redraw(self):
-        """Redraws the plot with new values.
+        """Redraws the plot with the current values.
+        
+        This is a full redraw and includes recalculating averages and regressions.
+        It should not be called many times per second as that would be slow.
+        Calling it every couple seconds should create no noticeable slowdown though.
+        
         Args:
             epoch: The index of the current epoch, starting at 0.
             train_loss: All of the training loss values of each
@@ -205,19 +285,25 @@ class LossAccPlotter(object):
             val_acc: All of the validation accuracy values of each
                 epoch (list of floats).
         """
+        # initialize the plot if it's the first redraw
         if self.fig is None:
             self._initialize_plot()
+
+        # activate the plot, in case another plot was opened since the last call
         plt.figure(self.fig.number)
 
+        # draw the title
         # putting title into the redraw method instead of into _initialize_plot()
         # allows for changing the title regularly, e.g. to show the current
         # epoch number or best achieved values.
         if self.title is not None:
             self.fig.suptitle(self.title, fontsize=self.title_fontsize)
 
+        # shorter local variables
         ax1 = self.ax_loss
         ax2 = self.ax_acc
 
+        # set chart titles, x-/y-labels and grid
         for ax, label in zip([ax1, ax2], ["Loss", "Accuracy"]):
             if ax:
                 ax.clear()
@@ -253,14 +339,24 @@ class LossAccPlotter(object):
                        loc="upper center",
                        bbox_to_anchor=(0.5, -0.08),
                        ncol=ncol)
+        
+        # save the redrawn plot to a file upon every redraw.
+        # save_plot will automatically do nothing if no filepath was set in the
+        # constructor.
+        self.save_plot()
 
     def _redraw_main_lines(self):
+        """Draw the main lines of values (i.e. loss train, loss val, acc train, acc val).
+        
+        Returns:
+            List of handles (one per line).
+        """
         handles = []
         ax1 = self.ax_loss
         ax2 = self.ax_acc
 
         # Set the styles of the lines used in the charts
-        # Different line style for epochs after the  first one, because
+        # Different line style for epochs after the first one, because
         # the very first epoch has only one data point and therefore no line
         # and would be invisible without the changed style.
         ls_loss_train = self.linestyles["loss_train"]
@@ -294,6 +390,15 @@ class LossAccPlotter(object):
         return handles
 
     def _redraw_averages(self):
+        """Draw the moving averages of each line.
+        
+        If moving averages has been deactived in the constructor, this function
+        will do nothing.
+        
+        Returns:
+            List of handles (one per line).
+        """
+        # abort if moving averages have been deactivated
         if not self.show_averages:
             return []
 
@@ -303,11 +408,13 @@ class LossAccPlotter(object):
     
         # calculate the xy-values
         if ax1:
+            # for loss chart
             (lt_sma_x, lt_sma_y) = self._calc_sma(self.values_loss_train_x,
                                                   self.values_loss_train_y)
             (lv_sma_x, lv_sma_y) = self._calc_sma(self.values_loss_val_x,
                                                   self.values_loss_val_y)
         if ax2:
+            # for accuracy chart
             (at_sma_x, at_sma_y) = self._calc_sma(self.values_acc_train_x,
                                                   self.values_acc_train_y)
             (av_sma_x, av_sma_y) = self._calc_sma(self.values_acc_val_x,
@@ -316,6 +423,7 @@ class LossAccPlotter(object):
         # plot the xy-values
         alpha_sma = 0.9
         if ax1:
+            # for loss chart
             h_lt, = ax1.plot(lt_sma_x, lt_sma_y, self.linestyles["loss_train_sma"],
                              label="train loss (SMA %d)" % (self.averages_period,),
                              alpha=alpha_sma)
@@ -324,6 +432,7 @@ class LossAccPlotter(object):
                              alpha=alpha_sma)
             handles.extend([h_lt, h_lv])
         if ax2:
+            # for accuracy chart
             h_at, = ax2.plot(at_sma_x, at_sma_y, self.linestyles["acc_train_sma"],
                              label="train acc (SMA %d)" % (self.averages_period,),
                              alpha=alpha_sma)
@@ -335,6 +444,15 @@ class LossAccPlotter(object):
         return handles
 
     def _redraw_regressions(self):
+        """Draw the moving regressions of each line, i.e. the predictions of
+        future values.
+        
+        If regressions have been deactived in the constructor, this function
+        will do nothing.
+        
+        Returns:
+            List of handles (one per line).
+        """
         if not self.show_regressions:
             return []
 
@@ -345,12 +463,14 @@ class LossAccPlotter(object):
         # calculate future values for loss train (lt), loss val (lv),
         # acc train (at) and acc val (av)
         if ax1:
+            # for loss chart
             lt_regression = self._calc_regression(self.values_loss_train_x,
                                                   self.values_loss_train_y)
             lv_regression = self._calc_regression(self.values_loss_val_x,
                                                   self.values_loss_val_y)
         # predicting accuracy values isnt necessary if theres no acc chart
         if ax2:
+            # for accuracy chart
             at_regression = self._calc_regression(self.values_acc_train_x,
                                                   self.values_acc_train_y)
             av_regression = self._calc_regression(self.values_acc_val_x,
@@ -359,6 +479,7 @@ class LossAccPlotter(object):
         # plot the predicted values
         alpha_regression = 0.9
         if ax1:
+            # for loss chart
             h_lt, = ax1.plot(lt_regression[0], lt_regression[1],
                              self.linestyles["loss_train_regression"],
                              label="loss train regression",
@@ -368,6 +489,7 @@ class LossAccPlotter(object):
                              label="loss val. regression",
                              alpha=alpha_regression)
         if ax2:
+            # for accuracy chart
             h_at, = ax2.plot(at_regression[0], at_regression[1],
                              self.linestyles["acc_train_regression"],
                              label="acc train regression",
@@ -381,6 +503,17 @@ class LossAccPlotter(object):
         return handles
 
     def _calc_sma(self, x_values, y_values):
+        """Calculate the moving average for one line (given as two lists, one
+        for its x-values and one for its y-values).
+
+        Args:
+            x_values: x-coordinate of each value.
+            y_values: y-coordinate of each value.
+
+        Returns:
+            Tuple (x_values, y_values), where x_values are the x-values of
+            the line and y_values are the y-values of the line.
+        """
         result_x, result_y, last_ys = [], [], []
         running_sum = 0
         period = self.averages_period
@@ -395,9 +528,23 @@ class LossAccPlotter(object):
         return (x_values, result_y)
 
     def _calc_regression(self, x_values, y_values):
+        """Calculate the regression for one line (given as two lists, one
+        for its x-values and one for its y-values).
+
+        Args:
+            x_values: x-coordinate of each value.
+            y_values: y-coordinate of each value.
+
+        Returns:
+            Tuple (x_values, y_values), where x_values are the predicted x-values
+            of the line and y_values are the predicted y-values of the line.
+        """
         if not x_values or len(x_values) < 2:
             return ([], [])
 
+        # This currently assumes that the last added x-value for the line
+        # was indeed that highest x-value.
+        # This could be avoided by tracking the max value for each line.
         last_x = x_values[-1]
         nb_values = len(x_values)
 
@@ -405,26 +552,30 @@ class LossAccPlotter(object):
         # in the past, e.g. based on the last 10 values.
         # n_backwards is calculated relative to the current epoch
         # (e.g. at epoch 100 compute based on the last 10 values,
-        # at 200 based on the last 20 values...).
-        #n_backward = int((last_x + 1) * self.poly_backward_perc)
+        # at 200 based on the last 20 values...). It has a minimum (e.g. never
+        # use less than 5 epochs (unless there are only less than 5 epochs))
+        # and a maximum (e.g. never use more than 1000 epochs).
+        # The minimum prevents bad predictions.
+        # The maximum
+        #   a) is better for performance
+        #   b) lets the regression react faster in case you change something
+        #      in the hyperparameters after a long time of training.
         n_backward = int(nb_values * self.poly_backward_perc)
         n_backward = max(n_backward, self.poly_n_backward_min)
         n_backward = min(n_backward, self.poly_n_backward_max)
 
         # Compute the regression lines for the n_forward future epochs.
-        # n_forward is calculated relative to the current epoch
-        # (e.g. at epoch 100 compute 10 next, at 200 the 20 next ones...).
-        #n_forward = int((last_x + 1) * self.poly_forward_perc)
+        # n_forward also has a reletive factor, as well as minimum and maximum
+        # values (see n_backward).
         n_forward = int(nb_values * self.poly_forward_perc)
         n_forward = max(n_forward, self.poly_n_forward_min)
         n_forward = min(n_forward, self.poly_n_forward_max)
 
-        if n_backward <= 0 and n_forward <= 0:
+        # return nothing of the values turn out too low
+        if n_backward <= 1 or n_forward <= 0:
             return ([], [])
 
-        #print("n_backwards", n_backwards)
-        #print("x_values", x_values[-n_backwards:])
-        #print("y_values", y_values[-n_backwards:])
+        # create/train the regression model
         fit = np.polyfit(x_values[-n_backward:], y_values[-n_backward:],
                          self.poly_degree)
         poly = np.poly1d(fit)
