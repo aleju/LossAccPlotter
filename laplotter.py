@@ -1,3 +1,35 @@
+"""A class to generate plots for the results of applied loss functions and/or
+accuracy of models trained with machine learning methods.
+
+Example:
+    plotter = LossAccPlotter()
+    for epoch in range(100):
+        loss_train, acc_train = your_model.train()
+        loss_val, acc_val = your_model.validate()
+        plotter.add_values(epoch,
+                           loss_train=loss_train, acc_train=acc_train,
+                           loss_val=loss_val, acc_val=acc_val)
+    plotter.block()
+
+Example, no accuracy chart:
+    plotter = LossAccPlotter(show_acc_plot=False)
+    for epoch in range(100):
+        loss_train = your_model.train()
+        loss_val = your_model.validate()
+        plotter.add_values(epoch, loss_train=loss_train, loss_val=loss_val)
+    plotter.block()
+
+Example, update the validation line only every 10th epoch:
+    plotter = LossAccPlotter(show_acc_plot=False)
+    for epoch in range(100):
+        loss_train = your_model.train()
+        if epoch % 10 == 0:
+            loss_val = your_model.validate()
+        else:
+            loss_val = None
+        plotter.add_values(epoch, loss_train=loss_train, loss_val=loss_val)
+    plotter.block()
+"""
 from __future__ import absolute_import
 from __future__ import print_function
 
