@@ -15,6 +15,16 @@ def main():
     print("")
     print("------------------")
     print("150 datapoints")
+    print("Saved to file 'plot.png'")
+    print("------------------")
+    (loss_train, loss_val, acc_train, acc_val) = create_values(150)
+    show_chart(loss_train, loss_val, acc_train, acc_val,
+               lap=LossAccPlotter(save_to_filepath="plot.png"),
+               title="150 datapoints, saved to file 'plot.png'")
+
+    print("")
+    print("------------------")
+    print("150 datapoints")
     print("No accuracy chart")
     print("------------------")
     (loss_train, loss_val, _, _) = create_values(150)
