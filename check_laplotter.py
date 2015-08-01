@@ -7,10 +7,13 @@ How to run them:
 """
 from __future__ import print_function, division
 from laplotter import LossAccPlotter
-import matplotlib.pyplot as plt
 import numpy as np
 
 def main():
+    """Run various checks on the LossAccPlotter.
+    They all follow the same pattern: Generate some random data (lines)
+    to display. Then display them (using various settings).
+    """
     print("")
     print("------------------")
     print("1 datapoint")
@@ -71,7 +74,7 @@ def main():
     show_chart(loss_train, loss_val, acc_train, acc_val,
                lap=LossAccPlotter(show_regressions=False),
                title="150 datapoints, regressions deactivated")
-    
+
     print("")
     print("------------------")
     print("150 datapoints")
@@ -89,8 +92,9 @@ def main():
     print("------------------")
     (loss_train, loss_val, acc_train, acc_val) = create_values(150)
 
+    # this should create a warning when LossAccPlotter.add_values() gets called.
     loss_train[5] = float("nan")
-    
+
     show_chart(loss_train, loss_val, acc_train, acc_val,
                title="150 datapoints, one having value NaN (loss train at x=5)")
 
@@ -118,7 +122,7 @@ def main():
 
 def create_values(nb_points):
     """Generate example (y-)values for all lines with some added random noise.
-    
+
     Args:
         nb_points: Number of example values
     Returns:
@@ -130,11 +134,11 @@ def create_values(nb_points):
     """
     # we add a bit more noise (0.1) to the validation data compared to the
     # training data (0.05), which seems more realistic
-    lt = add_noise(np.linspace(0.8, 0.1, num=nb_points), 0.05)
-    lv = add_noise(np.linspace(0.7, 0.2, num=nb_points), 0.1)
-    at = add_noise(np.linspace(0.5, 0.85, num=nb_points), 0.05)
-    av = add_noise(np.linspace(0.6, 0.75, num=nb_points), 0.1)
-    return (lt, lv, at, av)
+    loss_train = add_noise(np.linspace(0.8, 0.1, num=nb_points), 0.05)
+    loss_val = add_noise(np.linspace(0.7, 0.2, num=nb_points), 0.1)
+    acc_train = add_noise(np.linspace(0.5, 0.85, num=nb_points), 0.05)
+    acc_val = add_noise(np.linspace(0.6, 0.75, num=nb_points), 0.1)
+    return (loss_train, loss_val, acc_train, acc_val)
 
 def add_noise(values, scale):
     """Add normal distributed noise to an array.
@@ -159,22 +163,33 @@ def show_chart(loss_train, loss_val, acc_train, acc_val, lap=None, title=None):
         title: The title to use for the plot, i.e. LossAccPlotter.title .
     """
     lap = LossAccPlotter() if lap is None else lap
+
+    # set the plot title, which will be shown at the very top of the plot
     if title is not None:
         lap.title = title
 
+    # add loss train line/values
     for idx in range(loss_train.shape[0]):
-        lt = loss_train[idx] if loss_train[idx] != -1.0 else None
-        lap.add_values(idx, loss_train=lt, redraw=False)
-    for idx in range(loss_val.shape[0]):
-        lv = loss_val[idx] if loss_val[idx] != -1.0 else None
-        lap.add_values(idx, loss_val=lv, redraw=False)
-    for idx in range(acc_train.shape[0]):
-        at = acc_train[idx] if acc_train[idx] != -1.0 else None
-        lap.add_values(idx, acc_train=at, redraw=False)
-    for idx in range(acc_val.shape[0]):
-        av = acc_val[idx] if acc_val[idx] != -1.0 else None
-        lap.add_values(idx, acc_val=av, redraw=False)
+        lt_val = loss_train[idx] if loss_train[idx] != -1.0 else None
+        lap.add_values(idx, loss_train=lt_val, redraw=False)
 
+    # add loss validation line/values
+    for idx in range(loss_val.shape[0]):
+        lv_val = loss_val[idx] if loss_val[idx] != -1.0 else None
+        lap.add_values(idx, loss_val=lv_val, redraw=False)
+
+    # add accuracy training line/values
+    for idx in range(acc_train.shape[0]):
+        at_val = acc_train[idx] if acc_train[idx] != -1.0 else None
+        lap.add_values(idx, acc_train=at_val, redraw=False)
+
+    # add accuracy validation line/values
+    for idx in range(acc_val.shape[0]):
+        av_val = acc_val[idx] if acc_val[idx] != -1.0 else None
+        lap.add_values(idx, acc_val=av_val, redraw=False)
+
+    # redraw once after adding all values, because that's significantly
+    # faster than redrawing many times
     lap.redraw()
 
     # block at the end so that the plot does not close immediatly.
