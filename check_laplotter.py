@@ -59,6 +59,16 @@ def main():
     print("")
     print("------------------")
     print("150 datapoints")
+    print("No accuracy chart")
+    print("------------------")
+    (loss_train, loss_val, _, _) = create_values(150)
+    show_chart(loss_train, loss_val, np.array([]), np.array([]),
+               lap=LossAccPlotter(show_acc_plot=False),
+               title="150 datapoints, no accuracy chart")
+
+    print("")
+    print("------------------")
+    print("150 datapoints")
     print("Only validation values (no training lines)")
     print("------------------")
     (_, loss_val, _, acc_val) = create_values(150)
