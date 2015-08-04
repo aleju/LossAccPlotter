@@ -20,17 +20,17 @@ Some Features:
 
 # Example images
 
-![Example plot with loss and accuracy](example_plot.png?raw=true "Example plot with loss and accuracy")
+![Example plot with loss and accuracy](images/example_plot.png?raw=true "Example plot with loss and accuracy")
 
-![Example plot, only loss function](example_plot_loss.png?raw=true "Example plot, only loss function")
+![Example plot, only loss function](images/example_plot_loss.png?raw=true "Example plot, only loss function")
 
-![Example plot, different update intervals](example_plot_update_intervals.png?raw=true "Example plot, different update intervals")
+![Example plot, different update intervals](images/example_plot_update_intervals.png?raw=true "Example plot, different update intervals")
 
-![Example plot, only training set results](example_plot_only_training.png?raw=true "Example plot, only training set results")
+![Example plot, only training set results](images/example_plot_only_training.png?raw=true "Example plot, only training set results")
 
 # Example code
 
-In order to use the `LossAccPlotter`, simply copy `laplotter.py` into your projects directory, import `LossAccPlotter` from the file and then add some values to the plotted lines, as shown in the following examples.
+In order to use the `LossAccPlotter`, simply copy `laplotter.py` into your project's directory, import `LossAccPlotter` from the file and then add some values to the plotted lines, as shown in the following examples.
 
 Example loop over 100 epochs:
 
