@@ -255,23 +255,13 @@ class LossAccPlotter(object):
             plt.figure(self.fig.number)
             plt.show()
 
-    def save_plot(self, filepath=None):
+    def save_plot(self, filepath):
         """Saves the current plot to a file.
-        This function will automatically be called upon redraw.
-        This function will silently do nothing if save_to_filepath was not
-        set in the constructor, unless the parameter filepath was set to some
-        value.
 
         Args:
-            filepath: The path to the file, e.g. "/tmp/last_plot.png". If set
-                to None, the filepath that was set in the constructor will be
-                used. If that was also None, the function will do nothing.
-                (Default is None.)
+            filepath: The path to the file, e.g. "/tmp/last_plot.png".
         """
-        if self.save_to_filepath is not None:
-            self.fig.savefig(self.save_to_filepath)
-        elif filepath is not None:
-            self.fig.savefig(filepath)
+        self.fig.savefig(filepath, bbox_inches="tight")
 
     def _initialize_plot(self):
         """Creates empty figure and axes of the plot and shows it in a new window.
@@ -372,9 +362,8 @@ class LossAccPlotter(object):
                        ncol=ncol)
 
         # save the redrawn plot to a file upon every redraw.
-        # save_plot will automatically do nothing if no filepath was set in the
-        # constructor.
-        self.save_plot()
+        if self.save_to_filepath is not None:
+            self.save_plot(self.save_to_filepath)
 
     def _redraw_main_lines(self):
         """Draw the main lines of values (i.e. loss train, loss val, acc train, acc val).
