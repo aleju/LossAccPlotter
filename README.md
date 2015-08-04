@@ -24,7 +24,7 @@ Some Features:
 
 ![Example plot, only loss function](example_plot_loss.png?raw=true "Example plot, only loss function")
 
-![Example plot, different update intervals](example_update_intervals.png?raw=true "Example plot, different update intervals")
+![Example plot, different update intervals](example_plot_update_intervals.png?raw=true "Example plot, different update intervals")
 
 ![Example plot, only training set results](example_plot_only_training.png?raw=true "Example plot, only training set results")
 
