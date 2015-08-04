@@ -20,13 +20,13 @@ Some Features:
 
 # Example images
 
-![Example plot with loss and accuracy](example_plot.jpg?raw=true "Example plot with loss and accuracy")
+![Example plot with loss and accuracy](example_plot.png?raw=true "Example plot with loss and accuracy")
 
-![Example plot, only loss function](example_plot_loss.jpg?raw=true "Example plot, only loss function")
+![Example plot, only loss function](example_plot_loss.png?raw=true "Example plot, only loss function")
 
-![Example plot, different update intervals](example_update_intervals.jpg?raw=true "Example plot, different update intervals")
+![Example plot, different update intervals](example_update_intervals.png?raw=true "Example plot, different update intervals")
 
-![Example plot, only training set results](example_plot_only_training.jpg?raw=true "Example plot, only training set results")
+![Example plot, only training set results](example_plot_only_training.png?raw=true "Example plot, only training set results")
 
 # Example code
 
