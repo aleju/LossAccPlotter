@@ -37,6 +37,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import warnings
 import math
+from collections import OrderedDict
 
 def ignore_nan_and_inf(value, label, x_index):
     """Helper function that creates warnings on NaN/INF and converts them to None.
@@ -72,6 +73,7 @@ class LossAccPlotter(object):
                  show_plot_window=True,
                  x_label="Epoch"):
         """Constructs the plotter.
+
         Args:
             title: An optional title which will be shown at the top of the
                 plot. E.g. the name of the experiment or some info about it.
@@ -109,6 +111,15 @@ class LossAccPlotter(object):
         self.show_plot_window = show_plot_window
         self.save_to_filepath = save_to_filepath
         self.x_label = x_label
+
+        # alpha values
+        # 0.8 = quite visible line
+        # 0.5 = moderately visible line
+        # thick is used for averages and regression (also for the main values,
+        # if there are no averages),
+        # thin is used for the main values
+        self.alpha_thick = 0.8
+        self.alpha_thin = 0.5
 
         # the interval for the moving averages, e.g. 20 = average over 20 epochs
         self.averages_period = 20
@@ -164,24 +175,17 @@ class LossAccPlotter(object):
         self.ax_loss = None
         self.ax_acc = None
 
-        # lists for the values of each line
-        # might be reasonable to change this to ordered dictionaries of
-        # the form x => y, to prevent multiple values with the same x-coordinate
-        # (per line)
-        self.values_loss_train_x = []
-        self.values_loss_val_x = []
-        self.values_acc_train_x = []
-        self.values_acc_val_x = []
-        self.values_loss_train_y = []
-        self.values_loss_val_y = []
-        self.values_acc_train_y = []
-        self.values_acc_val_y = []
+        # dictionaries with x, y values for each line
+        self.values_loss_train = OrderedDict()
+        self.values_loss_val = OrderedDict()
+        self.values_acc_train = OrderedDict()
+        self.values_acc_val = OrderedDict()
 
     def add_values(self, x_index, loss_train=None, loss_val=None, acc_train=None,
                    acc_val=None, redraw=True):
         """Function to add new values for each line for a specific x-value (e.g.
         a specific epoch).
-        
+
         Meaning of the values / lines:
          - loss_train: y-value of the loss function applied to the training set.
          - loss_val:   y-value of the loss function applied to the validation set.
@@ -189,16 +193,16 @@ class LossAccPlotter(object):
                        the training set.
          - acc_val:    y-value of the accuracy (e.g. 0.0 to 1.0) when measured on
                        the validation set.
-        
+
         Values that are None will be ignored.
         Values that are INF or NaN will be ignored, but create a warning.
-        
+
         It is currently assumed that added values follow logically after
-        each other, so the x_index might be first 1, then 2, then 3, ...
-        instead of 10, 11, 5, 7, ...
-        If that is not the case, you will get problems with the calculation
-        of the regression.
-        
+        each other (progressive order), so the first x_index might be 1 (first entry),
+        then 2 (second entry), then 3 (third entry), ...
+        Not allowed would be e.g.: 10, 11, 5, 7, ...
+        If that is not the case, you will get a broken line graph.
+
         Args:
             x_index: The x-coordinate, e.g. x_index=5 might represent Epoch 5.
             loss_train: The y-value of the loss train line at the given x_index.
@@ -224,31 +228,26 @@ class LossAccPlotter(object):
         acc_val = ignore_nan_and_inf(acc_val, "acc val", x_index)
 
         if loss_train is not None:
-            self.values_loss_train_x.append(x_index)
-            self.values_loss_train_y.append(loss_train)
+            self.values_loss_train[x_index] = loss_train
         if loss_val is not None:
-            self.values_loss_val_x.append(x_index)
-            self.values_loss_val_y.append(loss_val)
+            self.values_loss_val[x_index] = loss_val
         if acc_train is not None:
-            self.values_acc_train_x.append(x_index)
-            self.values_acc_train_y.append(acc_train)
+            self.values_acc_train[x_index] = acc_train
         if acc_val is not None:
-            self.values_acc_val_x.append(x_index)
-            self.values_acc_val_y.append(acc_val)
+            self.values_acc_val[x_index] = acc_val
 
         if redraw:
             self.redraw()
-            
 
     def block(self):
         """Function to show the plot in a blocking way.
-        
+
         This should be called at the end of your program. Otherwise the
         chart will be closed automatically (at the end).
         By default, the plot is shown in a non-blocking way, so that the
         program continues execution, which causes it to close automatically
         when the program finishes.
-        
+
         This function will silently do nothing if show_plot_window was set
         to False in the constructor.
         """
@@ -262,7 +261,7 @@ class LossAccPlotter(object):
         This function will silently do nothing if save_to_filepath was not
         set in the constructor, unless the parameter filepath was set to some
         value.
-        
+
         Args:
             filepath: The path to the file, e.g. "/tmp/last_plot.png". If set
                 to None, the filepath that was set in the constructor will be
@@ -301,11 +300,11 @@ class LossAccPlotter(object):
 
     def redraw(self):
         """Redraws the plot with the current values.
-        
+
         This is a full redraw and includes recalculating averages and regressions.
         It should not be called many times per second as that would be slow.
         Calling it every couple seconds should create no noticeable slowdown though.
-        
+
         Args:
             epoch: The index of the current epoch, starting at 0.
             train_loss: All of the training loss values of each
@@ -371,7 +370,7 @@ class LossAccPlotter(object):
                        loc="upper center",
                        bbox_to_anchor=(0.5, -0.08),
                        ncol=ncol)
-        
+
         # save the redrawn plot to a file upon every redraw.
         # save_plot will automatically do nothing if no filepath was set in the
         # constructor.
@@ -379,7 +378,7 @@ class LossAccPlotter(object):
 
     def _redraw_main_lines(self):
         """Draw the main lines of values (i.e. loss train, loss val, acc train, acc val).
-        
+
         Returns:
             List of handles (one per line).
         """
@@ -395,27 +394,27 @@ class LossAccPlotter(object):
         ls_loss_val = self.linestyles["loss_val"]
         ls_acc_train = self.linestyles["acc_train"]
         ls_acc_val = self.linestyles["acc_val"]
-        if len(self.values_loss_train_x) == 1:
+        if len(self.values_loss_train) == 1:
             ls_loss_train = self.linestyles_one_value["loss_train"]
-        if len(self.values_loss_val_x) == 1:
+        if len(self.values_loss_val) == 1:
             ls_loss_val = self.linestyles_one_value["loss_val"]
-        if len(self.values_acc_train_x) == 1:
+        if len(self.values_acc_train) == 1:
             ls_acc_train = self.linestyles_one_value["acc_train"]
-        if len(self.values_acc_val_x) == 1:
+        if len(self.values_acc_val) == 1:
             ls_acc_val = self.linestyles_one_value["acc_val"]
 
         # Plot the lines
-        alpha_main = 0.5 if self.show_averages else 0.8
+        alpha_main = self.alpha_thin if self.show_averages else self.alpha_thick
         if ax1:
-            h_lt, = ax1.plot(self.values_loss_train_x, self.values_loss_train_y,
+            h_lt, = ax1.plot(self.values_loss_train.keys(), self.values_loss_train.values(),
                              ls_loss_train, label="loss train", alpha=alpha_main)
-            h_lv, = ax1.plot(self.values_loss_val_x, self.values_loss_val_y,
+            h_lv, = ax1.plot(self.values_loss_val.keys(), self.values_loss_val.values(),
                              ls_loss_val, label="loss val.", alpha=alpha_main)
             handles.extend([h_lt, h_lv])
         if ax2:
-            h_at, = ax2.plot(self.values_acc_train_x, self.values_acc_train_y,
+            h_at, = ax2.plot(self.values_acc_train.keys(), self.values_acc_train.values(),
                              ls_acc_train, label="acc. train", alpha=alpha_main)
-            h_av, = ax2.plot(self.values_acc_val_x, self.values_acc_val_y,
+            h_av, = ax2.plot(self.values_acc_val.keys(), self.values_acc_val.values(),
                              ls_acc_val, label="acc. val.", alpha=alpha_main)
             handles.extend([h_at, h_av])
 
@@ -423,10 +422,10 @@ class LossAccPlotter(object):
 
     def _redraw_averages(self):
         """Draw the moving averages of each line.
-        
+
         If moving averages has been deactived in the constructor, this function
         will do nothing.
-        
+
         Returns:
             List of handles (one per line).
         """
@@ -437,39 +436,39 @@ class LossAccPlotter(object):
         handles = []
         ax1 = self.ax_loss
         ax2 = self.ax_acc
-    
+
         # calculate the xy-values
         if ax1:
             # for loss chart
-            (lt_sma_x, lt_sma_y) = self._calc_sma(self.values_loss_train_x,
-                                                  self.values_loss_train_y)
-            (lv_sma_x, lv_sma_y) = self._calc_sma(self.values_loss_val_x,
-                                                  self.values_loss_val_y)
+            (lt_sma_x, lt_sma_y) = self._calc_sma(self.values_loss_train.keys(),
+                                                  self.values_loss_train.values())
+            (lv_sma_x, lv_sma_y) = self._calc_sma(self.values_loss_val.keys(),
+                                                  self.values_loss_val.values())
         if ax2:
             # for accuracy chart
-            (at_sma_x, at_sma_y) = self._calc_sma(self.values_acc_train_x,
-                                                  self.values_acc_train_y)
-            (av_sma_x, av_sma_y) = self._calc_sma(self.values_acc_val_x,
-                                                  self.values_acc_val_y)
+            (at_sma_x, at_sma_y) = self._calc_sma(self.values_acc_train.keys(),
+                                                  self.values_acc_train.values())
+            (av_sma_x, av_sma_y) = self._calc_sma(self.values_acc_val.keys(),
+                                                  self.values_acc_val.values())
 
         # plot the xy-values
-        alpha_sma = 0.9
+        alpha_sma = self.alpha_thick
         if ax1:
             # for loss chart
             h_lt, = ax1.plot(lt_sma_x, lt_sma_y, self.linestyles["loss_train_sma"],
-                             label="train loss (SMA %d)" % (self.averages_period,),
+                             label="train loss (avg %d)" % (self.averages_period,),
                              alpha=alpha_sma)
             h_lv, = ax1.plot(lv_sma_x, lv_sma_y, self.linestyles["loss_val_sma"],
-                             label="val loss (SMA %d)" % (self.averages_period,),
+                             label="val loss (avg %d)" % (self.averages_period,),
                              alpha=alpha_sma)
             handles.extend([h_lt, h_lv])
         if ax2:
             # for accuracy chart
             h_at, = ax2.plot(at_sma_x, at_sma_y, self.linestyles["acc_train_sma"],
-                             label="train acc (SMA %d)" % (self.averages_period,),
+                             label="train acc (avg %d)" % (self.averages_period,),
                              alpha=alpha_sma)
             h_av, = ax2.plot(av_sma_x, av_sma_y, self.linestyles["acc_val_sma"],
-                             label="acc. val. (SMA %d)" % (self.averages_period,),
+                             label="acc. val. (avg %d)" % (self.averages_period,),
                              alpha=alpha_sma)
             handles.extend([h_at, h_av])
 
@@ -478,10 +477,10 @@ class LossAccPlotter(object):
     def _redraw_regressions(self):
         """Draw the moving regressions of each line, i.e. the predictions of
         future values.
-        
+
         If regressions have been deactived in the constructor, this function
         will do nothing.
-        
+
         Returns:
             List of handles (one per line).
         """
@@ -496,20 +495,20 @@ class LossAccPlotter(object):
         # acc train (at) and acc val (av)
         if ax1:
             # for loss chart
-            lt_regression = self._calc_regression(self.values_loss_train_x,
-                                                  self.values_loss_train_y)
-            lv_regression = self._calc_regression(self.values_loss_val_x,
-                                                  self.values_loss_val_y)
+            lt_regression = self._calc_regression(self.values_loss_train.keys(),
+                                                  self.values_loss_train.values())
+            lv_regression = self._calc_regression(self.values_loss_val.keys(),
+                                                  self.values_loss_val.values())
         # predicting accuracy values isnt necessary if theres no acc chart
         if ax2:
             # for accuracy chart
-            at_regression = self._calc_regression(self.values_acc_train_x,
-                                                  self.values_acc_train_y)
-            av_regression = self._calc_regression(self.values_acc_val_x,
-                                                  self.values_acc_val_y)
+            at_regression = self._calc_regression(self.values_acc_train.keys(),
+                                                  self.values_acc_train.values())
+            av_regression = self._calc_regression(self.values_acc_val.keys(),
+                                                  self.values_acc_val.values())
 
         # plot the predicted values
-        alpha_regression = 0.9
+        alpha_regression = self.alpha_thick
         if ax1:
             # for loss chart
             h_lt, = ax1.plot(lt_regression[0], lt_regression[1],
@@ -520,6 +519,7 @@ class LossAccPlotter(object):
                              self.linestyles["loss_val_regression"],
                              label="loss val. regression",
                              alpha=alpha_regression)
+            handles.extend([h_lt, h_lv])
         if ax2:
             # for accuracy chart
             h_at, = ax2.plot(at_regression[0], at_regression[1],
@@ -546,7 +546,7 @@ class LossAccPlotter(object):
             Tuple (x_values, y_values), where x_values are the x-values of
             the line and y_values are the y-values of the line.
         """
-        result_x, result_y, last_ys = [], [], []
+        result_y, last_ys = [], []
         running_sum = 0
         period = self.averages_period
         # use a running sum here instead of avg(), should be slightly faster

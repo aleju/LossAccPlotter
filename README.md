@@ -129,7 +129,7 @@ plotter.block()
 
 # Tests
 
-There are no automized tests, as it's rather hard to measure the quality of a plot automatically.
+There are no automated tests, as it's rather hard to measure the quality of a plot automatically.
 You can however run a couple of checks on the library, which show various example plots.
 These plots should all look plausible and "beautiful".
 Run the checks via:
