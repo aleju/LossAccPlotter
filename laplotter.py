@@ -285,6 +285,13 @@ class LossAccPlotter(object):
                 ax.set_position([box.x0, box.y0 + box.height * 0.1,
                                  box.width, box.height * 0.9])
 
+        # draw the title
+        # it seems to be necessary to set the title here instead of in redraw(),
+        # otherwise the title is apparently added again and again with every
+        # epoch, making it ugly and bold
+        if self.title is not None:
+            self.fig.suptitle(self.title, fontsize=self.title_fontsize)
+
         if self.show_plot_window:
             plt.show(block=False)
 
@@ -312,13 +319,6 @@ class LossAccPlotter(object):
 
         # activate the plot, in case another plot was opened since the last call
         plt.figure(self.fig.number)
-
-        # draw the title
-        # putting title into the redraw method instead of into _initialize_plot()
-        # allows for changing the title regularly, e.g. to show the current
-        # epoch number or best achieved values.
-        if self.title is not None:
-            self.fig.suptitle(self.title, fontsize=self.title_fontsize)
 
         # shorter local variables
         ax1 = self.ax_loss
@@ -360,6 +360,8 @@ class LossAccPlotter(object):
                        loc="upper center",
                        bbox_to_anchor=(0.5, -0.08),
                        ncol=ncol)
+
+        plt.draw()
 
         # save the redrawn plot to a file upon every redraw.
         if self.save_to_filepath is not None:
