@@ -8,6 +8,7 @@ How to run them:
 from __future__ import print_function, division
 from laplotter import LossAccPlotter
 import numpy as np
+from time import sleep
 
 def main():
     """Run various checks on the LossAccPlotter.
@@ -129,6 +130,24 @@ def main():
 
     show_chart(loss_train, loss_val, acc_train, acc_val,
                title="1000 training datapoints, but only 100 validation datapoints")
+
+    print("")
+    print("------------------")
+    print("5 datapoints")
+    print("slowly added, one by one")
+    print("------------------")
+    (loss_train, loss_val, acc_train, acc_val) = create_values(5)
+    lap = LossAccPlotter(title="5 datapoints, slowly added one by one")
+
+    for idx in range(loss_train.shape[0]):
+        lap.add_values(idx,
+                       loss_train=loss_train[idx], loss_val=loss_val[idx],
+                       acc_train=acc_train[idx], acc_val=acc_val[idx],
+                       redraw=True)
+        sleep(1.0)
+
+    print("Close the chart to continue.")
+    lap.block()
 
 def create_values(nb_points):
     """Generate example (y-)values for all lines with some added random noise.
